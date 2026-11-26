@@ -247,3 +247,4 @@ then reload.
 - **No chat** of any kind.
 - **No real money.** Gems are earned by surviving. See PRD section 10.
 - **Anime art style** throughout: cel shading, dark outlines, painted faces. See PRD section 8.
+# natural-disaster-survivor
