@@ -1,0 +1,22 @@
+# Render deployment (https://render.com).
+#
+# The game builds to a folder of static files, so it needs Render's "Static
+# Site" type rather than a web service — there is no server, no database and
+# nothing to keep running. The free tier covers it, and a static site does
+# not sleep when idle the way a free web service does.
+
+services:
+  - type: web
+    name: natural-disaster-survivor
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    # Vite writes hashed asset names, so the bundle can be cached hard while
+    # the page itself is always fetched fresh.
+    headers:
+      - path: /game.js
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache

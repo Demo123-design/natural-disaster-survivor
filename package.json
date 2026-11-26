@@ -1,0 +1,18 @@
+{
+  "name": "natural-disaster-survivor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Natural Disaster Survivor - a 3D survival round game",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8"
+  }
+}

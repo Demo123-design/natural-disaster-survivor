@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Natural Disaster Survivor</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0d12; }
+  body { font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; color: #fff; }
+  canvas { display: block; }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+
+  .panel {
+    position: absolute;
+    background: rgba(12, 16, 24, 0.62);
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 15px;
+    letter-spacing: 0.4px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+  }
+
+  #stats { bottom: 18px; right: 18px; text-align: right; line-height: 1.5; }
+  #stats .gems { color: #68e0ff; font-weight: bold; }
+  #stats .wins { color: #ffd45e; font-weight: bold; }
+  #stats .rank { font-weight: bold; letter-spacing: 1px; font-size: 13px; text-transform: uppercase; }
+
+  #phase { top: 18px; left: 50%; transform: translateX(-50%); font-size: 18px; font-weight: bold; }
+
+  #prompt {
+    bottom: 22%; left: 50%; transform: translateX(-50%);
+    font-size: 16px; opacity: 0; transition: opacity 0.12s ease;
+  }
+  #prompt.show { opacity: 1; }
+  #prompt kbd {
+    display: inline-block; background: #fff; color: #111; border-radius: 5px;
+    padding: 1px 7px; font-weight: bold; font-family: inherit; margin-right: 4px;
+  }
+
+  #countdown {
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 30px; font-weight: bold; text-align: center;
+    padding: 18px 34px; display: none; border-color: rgba(120, 220, 255, 0.5);
+  }
+  #countdown.show { display: block; }
+  /* During a match the timer moves out of the centre, where it would sit on
+     top of the thing you are trying to look at. */
+  #countdown.compact {
+    top: 18px; left: auto; right: 18px; transform: none;
+    font-size: 22px; padding: 8px 16px; text-align: right;
+  }
+  #countdown.compact small { font-size: 12px; margin-top: 2px; }
+  #countdown small { display: block; font-size: 15px; font-weight: normal; opacity: 0.8; margin-top: 6px; }
+
+  #controls { bottom: 18px; left: 18px; font-size: 13px; line-height: 1.6; opacity: 0.75; }
+
+  #click-to-play {
+    position: fixed; inset: 0; z-index: 20;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(8, 10, 16, 0.86); cursor: pointer; text-align: center;
+  }
+  #click-to-play.hidden { display: none; }
+  #click-to-play h1 {
+    font-size: 46px; letter-spacing: 1px; margin-bottom: 10px;
+    background: linear-gradient(90deg, #ffd84d, #4fdc7b, #4fb8ff);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  #click-to-play p { opacity: 0.8; font-size: 17px; }
+  #click-to-play .hint { margin-top: 26px; font-size: 14px; opacity: 0.55; }
+
+  /* --- Username picker (first launch only) --------------------------- */
+
+  #name-picker {
+    position: fixed; inset: 0; z-index: 30;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(8, 10, 16, 0.92);
+  }
+  #name-picker.hidden { display: none; }
+  #name-picker .card {
+    width: min(460px, 90vw); text-align: center;
+    background: rgba(18, 22, 32, 0.95);
+    border: 2px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px; padding: 30px 32px 26px;
+  }
+  #name-picker h2 { font-size: 26px; letter-spacing: 0.5px; margin-bottom: 8px; }
+  #name-picker .sub { font-size: 14px; opacity: 0.7; line-height: 1.5; }
+  #name-picker input {
+    width: 100%; margin: 20px 0 8px; padding: 12px 14px;
+    font-family: inherit; font-size: 20px; text-align: center; letter-spacing: 1px;
+    color: #fff; background: rgba(0, 0, 0, 0.45);
+    border: 2px solid rgba(255, 255, 255, 0.22); border-radius: 9px;
+    outline: none;
+  }
+  #name-picker input:focus { border-color: rgba(120, 220, 255, 0.75); }
+  #name-picker .note { font-size: 13px; min-height: 18px; opacity: 0.75; }
+  #name-picker .note.bad { color: #ff8a8a; opacity: 1; }
+  #name-picker .row { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+  #name-picker button {
+    font-family: inherit; font-size: 15px; font-weight: bold; letter-spacing: 0.4px;
+    padding: 11px 20px; border-radius: 9px; cursor: pointer;
+    color: #0b0d12; background: #6fe0a0; border: none;
+  }
+  #name-picker button:disabled { opacity: 0.35; cursor: not-allowed; }
+  #name-picker button.ghost {
+    background: transparent; color: #fff;
+    border: 2px solid rgba(255, 255, 255, 0.28);
+  }
+  #name-picker .warn {
+    margin-top: 18px; font-size: 15px; line-height: 1.55;
+    border: 2px solid rgba(255, 210, 90, 0.5); border-radius: 10px;
+    background: rgba(255, 200, 70, 0.08); padding: 14px 16px;
+  }
+  #name-picker .warn b { color: #ffd45e; }
+  #name-picker .chosen { font-size: 24px; font-weight: bold; letter-spacing: 1px; }
+  #name-picker .step.hidden { display: none; }
+  #name-picker .step:focus { outline: none; }
+
+  /* --- Match HUD ------------------------------------------------------- */
+
+  #warning {
+    top: 62px; left: 50%; transform: translateX(-50%);
+    text-align: center; max-width: 440px; display: none;
+    border-color: rgba(255, 170, 90, 0.55);
+  }
+  #warning.show { display: block; }
+  #warning .what { font-size: 20px; font-weight: bold; color: #ffb26b; letter-spacing: 1px; }
+  #warning .advice { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+
+  #vitals {
+    /* Clear of the hotbar, which sits along the bottom during a match. */
+    bottom: 162px; left: 50%; transform: translateX(-50%);
+    width: 260px; text-align: center; display: none; padding: 7px 12px;
+  }
+  #vitals.show { display: block; }
+  #vitals .bar {
+    height: 12px; border-radius: 7px; overflow: hidden;
+    background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.25);
+  }
+  #vitals .fill {
+    height: 100%; width: 100%; background: #5fd97a;
+    transition: width 0.1s linear, background-color 0.3s ease;
+  }
+  #vitals .status { font-size: 13px; margin-top: 5px; min-height: 17px; color: #ffd06b; }
+  #vitals .label { font-size: 11px; letter-spacing: 1px; opacity: 0.7; margin-bottom: 4px; }
+
+  #results {
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; display: none; padding: 26px 40px; min-width: 330px;
+  }
+  #results.show { display: block; }
+  #results .verdict { font-size: 34px; font-weight: bold; letter-spacing: 1px; }
+  #results .verdict.good { color: #6fe0a0; }
+  #results .verdict.soft { color: #8ec8ff; }
+  #results .detail { font-size: 14px; opacity: 0.8; margin-top: 8px; }
+  #results .reward { font-size: 17px; margin-top: 14px; color: #ffd45e; font-weight: bold; }
+  #results .back { font-size: 13px; opacity: 0.6; margin-top: 16px; }
+
+  /* Tints the screen while the player is under water. */
+  #submerged {
+    position: fixed; inset: 0; z-index: 5; pointer-events: none;
+    background: radial-gradient(ellipse at center,
+      rgba(30, 90, 140, 0.25) 0%, rgba(14, 50, 86, 0.72) 100%);
+    opacity: 0; transition: opacity 0.25s ease;
+  }
+  #submerged.show { opacity: 1; }
+
+  /* --- Hotbar ---------------------------------------------------------- */
+
+  #hotbar {
+    bottom: 18px; left: 50%; transform: translateX(-50%);
+    display: none; gap: 8px; padding: 8px 10px;
+  }
+  #hotbar.show { display: flex; }
+  #hotbar .slot {
+    width: 58px; height: 60px; border-radius: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.35);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: relative;
+  }
+  #hotbar .slot.on { border-color: #ffd45e; background: rgba(255, 212, 94, 0.16); }
+  #hotbar .key { position: absolute; top: 2px; left: 5px; font-size: 10px; opacity: 0.6; }
+  #hotbar .chip {
+    width: 24px; height: 24px; border-radius: 5px; margin-bottom: 3px;
+    border: 1px solid rgba(0, 0, 0, 0.5);
+  }
+  #hotbar .tag { font-size: 10px; letter-spacing: 0.5px; opacity: 0.9; }
+  #hotbar .count { position: absolute; bottom: 2px; right: 5px; font-size: 11px; font-weight: bold; }
+  #hotbar .slot.empty .chip { background: rgba(255, 255, 255, 0.07); border-color: transparent; }
+
+  #buffs {
+    bottom: 90px; left: 50%; transform: translateX(-50%);
+    display: none; gap: 10px; padding: 5px 12px; font-size: 12px;
+  }
+  #buffs.show { display: flex; }
+  #buffs .buff { font-weight: bold; }
+  #buffs .water { color: #70cdf0; }
+  #buffs .torch { color: #ffc368; }
+
+  #flash {
+    bottom: 126px; left: 50%; transform: translateX(-50%);
+    font-size: 14px; display: none; padding: 6px 14px;
+  }
+  #flash.show { display: block; }
+  #flash.hint { opacity: 0.6; font-size: 13px; }
+
+  /* --- Progression ----------------------------------------------------- */
+
+  #stats .rank-row { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+  #stats .badge {
+    width: 13px; height: 13px; border-radius: 3px;
+    border: 1.5px solid rgba(0, 0, 0, 0.55);
+    transform: rotate(45deg);
+  }
+  #stats .track {
+    height: 5px; width: 128px; margin: 5px 0 2px auto; border-radius: 3px;
+    background: rgba(0, 0, 0, 0.5); overflow: hidden;
+  }
+  #stats .track span { display: block; height: 100%; width: 0; background: #ffd45e; }
+  #stats .toward { font-size: 10.5px; opacity: 0.72; letter-spacing: 0.2px; }
+
+  #results .earned {
+    display: flex; gap: 20px; justify-content: center; margin-top: 14px;
+    font-size: 15px; font-weight: bold;
+  }
+  #results .earned .win { color: #ffd45e; }
+  #results .earned .gem { color: #68e0ff; }
+  #results .totals { font-size: 12.5px; opacity: 0.7; margin-top: 8px; }
+
+  #results .rankup {
+    margin-top: 16px; padding: 12px 16px; border-radius: 10px; display: none;
+    border: 2px solid rgba(255, 212, 94, 0.6);
+    background: rgba(255, 212, 94, 0.12);
+  }
+  #results .rankup.show { display: block; animation: pop 0.5s ease-out; }
+  @keyframes pop {
+    0%   { transform: scale(0.7); opacity: 0; }
+    60%  { transform: scale(1.05); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  #results .rankup .label { font-size: 12px; letter-spacing: 2px; opacity: 0.85; }
+  #results .rankup .name { font-size: 26px; font-weight: bold; letter-spacing: 1px; margin-top: 2px; }
+
+
+  /* --- Shop and Roulette ------------------------------------------------ */
+
+  .sheet {
+    position: fixed; inset: 0; z-index: 25;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(8, 10, 16, 0.82);
+  }
+  .sheet.show { display: flex; }
+  .sheet .card {
+    width: min(760px, 92vw); max-height: 86vh; overflow-y: auto;
+    background: rgba(18, 22, 32, 0.97);
+    border: 2px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px; padding: 22px 24px;
+  }
+  .sheet h2 { font-size: 24px; letter-spacing: 0.5px; }
+  .sheet .head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+  .sheet .purse { font-size: 15px; font-weight: bold; color: #68e0ff; }
+  .sheet .sub { font-size: 13px; opacity: 0.68; margin-bottom: 14px; }
+  .sheet .close {
+    font-family: inherit; font-size: 14px; font-weight: bold; cursor: pointer;
+    padding: 9px 18px; border-radius: 9px; border: 2px solid rgba(255,255,255,0.28);
+    background: transparent; color: #fff; margin-top: 16px;
+  }
+
+  #shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+  .shade {
+    border: 2px solid rgba(255, 255, 255, 0.16); border-radius: 10px;
+    padding: 9px; text-align: center; cursor: pointer; background: rgba(0,0,0,0.25);
+  }
+  .shade:hover { border-color: rgba(255, 255, 255, 0.4); }
+  .shade.worn { border-color: #6fe0a0; background: rgba(111, 224, 160, 0.14); }
+  .shade.locked { opacity: 0.85; }
+  .shade.cant { opacity: 0.4; cursor: not-allowed; }
+  .shade .swatch { height: 42px; border-radius: 7px; border: 2px solid rgba(0,0,0,0.5); }
+  .shade .name { font-size: 12px; margin-top: 6px; }
+  .shade .price { font-size: 12px; font-weight: bold; margin-top: 3px; }
+  .shade .price.own { color: #6fe0a0; }
+  .shade .price.cost { color: #68e0ff; }
+  .shade .tier { font-size: 9.5px; letter-spacing: 1px; opacity: 0.6; margin-top: 2px; }
+
+  #spin-panel .odds { display: flex; gap: 8px; justify-content: center; margin: 14px 0 6px; }
+  #spin-panel .odd { flex: 1; padding: 8px 6px; border-radius: 8px; border: 2px solid; font-size: 12px; }
+  #spin-panel .odd b { display: block; font-size: 17px; margin-bottom: 2px; }
+  #spin-panel .row { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
+  #spin-panel button {
+    font-family: inherit; font-size: 15px; font-weight: bold; cursor: pointer;
+    padding: 11px 20px; border-radius: 9px; border: none;
+    color: #0b0d12; background: #ffd45e;
+  }
+  #spin-panel button:disabled { opacity: 0.35; cursor: not-allowed; }
+  #spin-panel button.ghost { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,0.28); }
+  #spin-panel .note { font-size: 12.5px; opacity: 0.7; margin-top: 12px; line-height: 1.5; }
+
+  #spin-result { text-align: center; }
+  #spin-result .won { font-size: 13px; letter-spacing: 2px; opacity: 0.8; }
+  #spin-result .shade-name { font-size: 32px; font-weight: bold; margin: 6px 0 10px; }
+  #spin-result .swatch-big {
+    width: 110px; height: 68px; margin: 0 auto 12px; border-radius: 10px;
+    border: 2px solid rgba(0,0,0,0.5);
+  }
+  #spin-result .tier-tag { font-size: 14px; font-weight: bold; letter-spacing: 1px; }
+  #spin-result .dup { color: #ffb26b; font-size: 15px; font-weight: bold; margin-top: 10px; }
+
+  /* --- Books and pause menu --------------------------------------------- */
+
+  #books .card { width: min(820px, 94vw); display: flex; gap: 18px; }
+  #books-list { width: 190px; flex: 0 0 auto; display: flex; flex-direction: column; gap: 4px; max-height: 60vh; overflow-y: auto; }
+  .book {
+    font-family: inherit; font-size: 13px; text-align: left; cursor: pointer;
+    padding: 7px 10px; border-radius: 7px; color: #fff;
+    background: rgba(0, 0, 0, 0.28); border: 2px solid transparent;
+  }
+  .book:hover { background: rgba(255, 255, 255, 0.08); }
+  .book.on { border-color: #ffd45e; background: rgba(255, 212, 94, 0.14); }
+  #book-pane { flex: 1; display: flex; flex-direction: column; min-height: 280px; }
+  #book-title { font-size: 22px; margin-bottom: 10px; }
+  #book-page { font-size: 16px; line-height: 1.65; flex: 1; opacity: 0.92; }
+  #book-nav { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  #book-nav button {
+    font-family: inherit; font-size: 14px; font-weight: bold; cursor: pointer;
+    padding: 8px 16px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.25);
+    background: transparent; color: #fff;
+  }
+  #book-nav button:disabled { opacity: 0.3; cursor: not-allowed; }
+  #book-count { font-size: 13px; opacity: 0.6; }
+
+  #pause .card { width: min(380px, 92vw); text-align: center; }
+  #pause .menu { display: flex; flex-direction: column; gap: 9px; margin-top: 16px; }
+  #pause .menu button {
+    font-family: inherit; font-size: 15px; font-weight: bold; cursor: pointer;
+    padding: 12px; border-radius: 9px; border: none; color: #0b0d12; background: #6fe0a0;
+  }
+  #pause .menu button.ghost {
+    background: transparent; color: #fff; border: 2px solid rgba(255,255,255,0.28);
+  }
+</style>
+</head>
+<body>
+  <div id="submerged"></div>
+
+  <div id="hud">
+    <div id="phase" class="panel">LOBBY</div>
+    <div id="stats" class="panel">
+      <div class="rank-row"><span class="rank" id="hud-rank">Unranked</span><span class="badge" id="hud-badge"></span></div>
+      <div class="track"><span id="hud-rank-fill"></span></div>
+      <div class="toward" id="hud-toward">&nbsp;</div>
+      <div><span class="wins" id="hud-wins">0</span> <span id="hud-wins-word">wins</span></div>
+      <div><span class="gems" id="hud-gems">0</span> gems</div>
+    </div>
+    <div id="prompt" class="panel"><kbd>E</kbd><span id="prompt-text">Interact</span></div>
+    <div id="countdown" class="panel">
+      <span id="countdown-time">15</span>
+      <small id="countdown-label">Match starting — step out of the portal to cancel</small>
+    </div>
+    <div id="warning" class="panel">
+      <div class="what" id="warning-what">Flood</div>
+      <div class="advice" id="warning-advice"></div>
+    </div>
+    <div id="vitals" class="panel">
+      <div class="label">ENERGY</div>
+      <div class="bar"><div class="fill" id="health-fill"></div></div>
+      <div class="status" id="vitals-status"></div>
+    </div>
+    <div id="results" class="panel">
+      <div class="verdict" id="results-verdict">YOU MADE IT!</div>
+      <div class="detail" id="results-detail"></div>
+      <div class="earned" id="results-earned"></div>
+      <div class="totals" id="results-totals"></div>
+      <div class="rankup" id="results-rankup">
+        <div class="label">NEW RANK</div>
+        <div class="name" id="results-rankup-name">BRASS</div>
+      </div>
+      <div class="reward" id="results-reward"></div>
+      <div class="back" id="results-back">Returning to the lobby...</div>
+    </div>
+    <div id="flash" class="panel"></div>
+    <div id="buffs" class="panel"></div>
+    <div id="hotbar" class="panel"></div>
+    <div id="controls" class="panel">
+      WASD / Arrows &mdash; move &nbsp;·&nbsp; Mouse &mdash; look<br />
+      Space &mdash; jump &nbsp;·&nbsp; Shift &mdash; sprint &nbsp;·&nbsp; E &mdash; interact &nbsp;·&nbsp; F &mdash; skip prepare<br />
+      Scroll &mdash; zoom &nbsp;·&nbsp; 1&ndash;5 &mdash; pick a supply &nbsp;·&nbsp; Click &mdash; use it<br />C &mdash; jackets &nbsp;·&nbsp; Esc &mdash; release mouse
+    </div>
+  </div>
+
+  <div id="name-picker" class="hidden">
+    <div class="card">
+      <div class="step" id="name-step-type">
+        <h2>Pick your name</h2>
+        <p class="sub">This is the name every other survivor sees above your head.</p>
+        <input id="name-input" maxlength="16" autocomplete="off" spellcheck="false"
+               placeholder="YourName" aria-label="Username" />
+        <p class="note" id="name-note">3&ndash;16 characters. Letters, numbers and _ only.</p>
+        <div class="row">
+          <button id="name-continue" disabled>Continue</button>
+        </div>
+      </div>
+
+      <div class="step hidden" id="name-step-confirm" tabindex="-1">
+        <h2>Is this right?</h2>
+        <p class="chosen" id="name-chosen">&nbsp;</p>
+        <div class="warn">
+          You choose your name <b>once</b>.<br />
+          It cannot be changed later, so check the spelling.
+        </div>
+        <div class="row">
+          <button class="ghost" id="name-back">Go back</button>
+          <button id="name-confirm">Yes, that's my name</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="shop" class="sheet">
+    <div class="card">
+      <div class="head">
+        <h2>Jackets</h2>
+        <span class="purse" id="shop-purse">0 gems</span>
+      </div>
+      <p class="sub" id="shop-sub">Click a jacket to wear it. Locked ones cost gems you have earned by surviving.</p>
+      <div id="shop-grid"></div>
+      <button class="close" id="shop-close">Close</button>
+    </div>
+  </div>
+
+  <div id="spin-panel" class="sheet">
+    <div class="card" style="width: min(440px, 92vw); text-align: center;">
+      <div id="spin-ask">
+        <h2>Roulette</h2>
+        <p class="sub">A random jacket for 750 gems.</p>
+        <div class="odds">
+          <div class="odd" style="border-color:#6ea8ff;color:#6ea8ff"><b>80%</b>Rare</div>
+          <div class="odd" style="border-color:#c77dff;color:#c77dff"><b>19%</b>Epic</div>
+          <div class="odd" style="border-color:#ffd45e;color:#ffd45e"><b>1%</b>Legendary</div>
+        </div>
+        <p class="note" id="spin-note"></p>
+        <div class="row">
+          <button class="ghost" id="spin-cancel">Not now</button>
+          <button id="spin-go">Spin for 750 gems</button>
+        </div>
+      </div>
+
+      <div id="spin-busy" style="display:none">
+        <h2>Spinning...</h2>
+        <p class="sub">Watch the wheel.</p>
+      </div>
+
+      <div id="spin-result" style="display:none">
+        <div class="won">YOU GOT</div>
+        <div class="swatch-big" id="spin-swatch"></div>
+        <div class="shade-name" id="spin-name">Indigo</div>
+        <div class="tier-tag" id="spin-tier">RARE</div>
+        <div class="dup" id="spin-dup"></div>
+        <div class="row">
+          <button id="spin-again">Spin again</button>
+          <button class="ghost" id="spin-done">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="books" class="sheet">
+    <div class="card">
+      <div id="books-list"></div>
+      <div id="book-pane">
+        <div class="head"><h2 id="book-title">How to play</h2></div>
+        <p id="book-page"></p>
+        <div id="book-nav">
+          <button id="book-prev">Back</button>
+          <button id="book-next">Next</button>
+          <span id="book-count">1 / 6</span>
+          <button class="close" id="books-close" style="margin:0 0 0 auto">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="pause" class="sheet">
+    <div class="card">
+      <h2>Paused</h2>
+      <p class="sub">Click resume to get the mouse back.</p>
+      <div class="menu">
+        <button id="pause-resume">Resume</button>
+        <button class="ghost" id="pause-sound">Sound: on</button>
+        <button class="ghost" id="pause-books">Survival books</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="click-to-play">
+    <h1>NATURAL DISASTER SURVIVOR</h1>
+    <p>Click to play</p>
+    <p class="hint">Mouse to look &nbsp;·&nbsp; WASD or arrow keys to move</p>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

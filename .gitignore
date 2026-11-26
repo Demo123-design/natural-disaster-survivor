@@ -1,0 +1,13 @@
+# Installed packages. Render and anyone else cloning this runs `npm install`
+# and gets them from package-lock.json, so committing them only makes the
+# repository enormous and slow to clone.
+node_modules/
+
+# Build output, rebuilt from source by `npm run build` on every deploy.
+dist/
+
+# Local editor and OS clutter.
+.DS_Store
+*.log
+.vscode/
+.idea/
