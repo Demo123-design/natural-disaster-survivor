@@ -18,11 +18,10 @@ first. It is not a repository yet.
 
 **1. Put it on GitHub**
 
-```bash
-git init && git add -A && git commit -m "Natural Disaster Survivor"
-```
-
-Then create an empty repository on GitHub and push to it:
+The repository is already set up here with one commit and a `.gitignore`
+that keeps `node_modules` and `dist` out of it. Create an **empty**
+repository on GitHub — no README, no .gitignore, no licence, or the first
+push will be rejected — then:
 
 ```bash
 git remote add origin https://github.com/YOUR-NAME/natural-disaster-survivor.git && git branch -M main && git push -u origin main
